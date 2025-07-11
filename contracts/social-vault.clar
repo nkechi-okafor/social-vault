@@ -493,3 +493,44 @@
     (ok true)
   )
 )
+
+(define-public (emergency-withdraw (amount uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-UNAUTHORIZED)
+    (asserts! (> amount u0) ERR-INVALID-AMOUNT)
+    (asserts! (<= amount (stx-get-balance (as-contract tx-sender))) ERR-INSUFFICIENT-BALANCE)
+    (try! (as-contract (stx-transfer? amount tx-sender CONTRACT-OWNER)))
+    (ok true)
+  )
+)
+
+;; CONTRACT INITIALIZATION
+
+;; Initialize default membership tiers
+(map-set membership-tiers u1 {
+  tier-name: "Bronze",
+  min-reputation: u1000,
+  benefits: "Basic access to creator content",
+  access-level: u1
+})
+
+(map-set membership-tiers u2 {
+  tier-name: "Silver", 
+  min-reputation: u2000,
+  benefits: "Enhanced access + exclusive content",
+  access-level: u2
+})
+
+(map-set membership-tiers u3 {
+  tier-name: "Gold",
+  min-reputation: u5000, 
+  benefits: "Premium access + governance rights",
+  access-level: u3
+})
+
+(map-set membership-tiers u4 {
+  tier-name: "Platinum",
+  min-reputation: u8000,
+  benefits: "Full access + revenue sharing",
+  access-level: u4
+})
