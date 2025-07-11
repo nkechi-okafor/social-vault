@@ -398,3 +398,98 @@
     )
   )
 )
+
+(define-public (mint-membership-certificate)
+  (let (
+    (user tx-sender)
+    (profile (unwrap! (map-get? user-profiles user) ERR-NOT-FOUND))
+    (current-reputation (unwrap! (get-current-reputation user) ERR-NOT-FOUND))
+    (tier (calculate-tier-for-reputation current-reputation))
+  )
+    (asserts! (not (is-contract-paused)) ERR-UNAUTHORIZED)
+    (asserts! (is-none (get membership-nft-id profile)) ERR-ALREADY-EXISTS)
+    (asserts! (>= current-reputation u1000) ERR-INSUFFICIENT-BALANCE)
+    
+    (let (
+      (nft-id (try! (mint-membership-nft user tier)))
+    )
+      (map-set user-profiles user
+        (merge profile {membership-nft-id: (some nft-id)})
+      )
+      (ok nft-id)
+    )
+  )
+)
+
+;; PUBLIC FUNCTIONS - CREATOR MANAGEMENT
+
+(define-public (update-creator-settings (threshold uint) (reward uint))
+  (let (
+    (creator tx-sender)
+    (current-settings (unwrap! (map-get? creator-settings creator) ERR-NOT-FOUND))
+  )
+    (asserts! (not (is-contract-paused)) ERR-UNAUTHORIZED)
+    (asserts! (> threshold u0) ERR-INVALID-THRESHOLD)
+    
+    (map-set creator-settings creator
+      (merge current-settings {
+        earnings-threshold: threshold,
+        reward-per-engagement: reward
+      })
+    )
+    (ok true)
+  )
+)
+
+(define-public (toggle-creator-status)
+  (let (
+    (creator tx-sender)
+    (current-settings (unwrap! (map-get? creator-settings creator) ERR-NOT-FOUND))
+  )
+    (map-set creator-settings creator
+      (merge current-settings {
+        is-active: (not (get is-active current-settings))
+      })
+    )
+    (ok true)
+  )
+)
+
+;; ADMIN FUNCTIONS
+
+(define-public (set-membership-tier (tier-id uint) (name (string-ascii 50)) (min-rep uint) (benefits (string-ascii 200)) (access uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-UNAUTHORIZED)
+    (asserts! (> tier-id u0) ERR-INVALID-TIER)
+    (asserts! (and (> tier-id u0) (<= tier-id u10)) ERR-INVALID-TIER) ;; Limit tier range
+    (asserts! (> min-rep u0) ERR-INVALID-THRESHOLD)
+    (asserts! (<= min-rep u50000) ERR-INVALID-THRESHOLD) ;; Max reputation limit
+    (asserts! (and (>= access u1) (<= access u5)) ERR-INVALID-AMOUNT) ;; Valid access levels
+    (asserts! (> (len name) u0) ERR-INVALID-AMOUNT) ;; Non-empty name
+    (asserts! (> (len benefits) u0) ERR-INVALID-AMOUNT) ;; Non-empty benefits
+    
+    (map-set membership-tiers tier-id {
+      tier-name: name,
+      min-reputation: min-rep,
+      benefits: benefits,
+      access-level: access
+    })
+    (ok true)
+  )
+)
+
+(define-public (pause-contract)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-UNAUTHORIZED)
+    (var-set contract-paused true)
+    (ok true)
+  )
+)
+
+(define-public (unpause-contract)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-UNAUTHORIZED)
+    (var-set contract-paused false)
+    (ok true)
+  )
+)
